@@ -13,6 +13,10 @@ namespace LightRecorder {
   /// <summary>
   /// Start with Windows, as a per-user logon task.
   ///
+  /// What starts is the hotkey listener when it is installed next to the app,
+  /// and the app itself otherwise. The listener is the process meant to stay
+  /// resident; the app only runs while its overlay is up.
+  ///
   /// This used to be a value under HKCU\...\Run, and after a reboot it quietly
   /// did nothing. A process started from inside a packaged (MSIX) app - an
   /// editor or a terminal installed as a package - inherits that package's
@@ -65,13 +69,15 @@ namespace LightRecorder {
       // second copy at logon, and with autostart off it should start nothing.
       RemoveLegacyRunValue();
 
-      string exe = Application.ExecutablePath;
+      bool listener = Listener.Exists;
+      string exe = listener ? Listener.ExePath : Application.ExecutablePath;
+      string arguments = listener ? "" : Argument;
       bool present;
-      bool current = IsCurrent(exe, out present);
+      bool current = IsCurrent(exe, arguments, out present);
       string error = null;
 
       if (enabled && !current) {
-        error = Create(exe);
+        error = Create(exe, arguments);
         if (error == null) Log.Info("autostart: logon task " + (present ? "re-pointed at " : "registered for ") + exe);
       } else if (!enabled && present) {
         error = Delete();
@@ -85,23 +91,23 @@ namespace LightRecorder {
     /// <summary>Does the task exist, and does it start this exe the way we
     /// would register it? A copy of the app that has moved, a task from an
     /// older build, or one disabled by hand is re-registered, not trusted.</summary>
-    static bool IsCurrent(string exe, out bool present) {
+    static bool IsCurrent(string exe, string arguments, out bool present) {
       string xml;
       present = Run("/Query /TN \"" + TaskName + "\" /XML", out xml) == 0;
       if (!present) return false;
 
       string command = (Element(xml, "Command") ?? "").Trim().Trim('"');
-      string arguments = (Element(xml, "Arguments") ?? "").Trim();
+      string stored = (Element(xml, "Arguments") ?? "").Trim();
       return string.Equals(command, exe, StringComparison.OrdinalIgnoreCase) &&
-             arguments == Argument &&
+             stored == arguments &&
              xml.IndexOf("<Enabled>false</Enabled>", StringComparison.OrdinalIgnoreCase) < 0;
     }
 
-    static string Create(string exe) {
+    static string Create(string exe, string arguments) {
       string file = Path.Combine(Path.GetTempPath(), "LightRecorder-task-" + Process.GetCurrentProcess().Id + ".xml");
       try {
         // UTF-16 to match the declaration; schtasks rejects a mismatch.
-        File.WriteAllText(file, TaskXml(exe, WindowsIdentity.GetCurrent().User.Value), Encoding.Unicode);
+        File.WriteAllText(file, TaskXml(exe, arguments, WindowsIdentity.GetCurrent().User.Value), Encoding.Unicode);
         string output;
         int code = Run("/Create /TN \"" + TaskName + "\" /XML \"" + file + "\" /F", out output);
         return code == 0 ? null : "could not register the logon task (" + FirstLine(output, code) + ")";
@@ -130,16 +136,17 @@ namespace LightRecorder {
     ///                       pacer would run, at below-normal CPU and I/O
     ///                       priority for the whole session
     /// </summary>
-    static string TaskXml(string exe, string sid) {
+    static string TaskXml(string exe, string arguments, string sid) {
       string command = SecurityElement.Escape(exe);
+      string args = SecurityElement.Escape(arguments ?? "");
       string dir = SecurityElement.Escape(Path.GetDirectoryName(exe) ?? "");
       string user = SecurityElement.Escape(sid);
       return
         "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\r\n" +
         "<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\r\n" +
         "  <RegistrationInfo>\r\n" +
-        "    <Description>Starts Light Recorder in the tray when you sign in, so its shortcuts work " +
-        "straight away. Managed by the app under Settings, Shortcuts, Start with Windows.</Description>\r\n" +
+        "    <Description>Starts Light Recorder's hotkey listener when you sign in, so its shortcut " +
+        "works straight away. Managed by the app under Settings, Shortcuts, Start with Windows.</Description>\r\n" +
         "  </RegistrationInfo>\r\n" +
         "  <Triggers>\r\n" +
         "    <LogonTrigger><Enabled>true</Enabled><UserId>" + user + "</UserId></LogonTrigger>\r\n" +
@@ -156,7 +163,7 @@ namespace LightRecorder {
         "    <Priority>5</Priority>\r\n" +
         "  </Settings>\r\n" +
         "  <Actions Context=\"Author\">\r\n" +
-        "    <Exec><Command>" + command + "</Command><Arguments>" + Argument + "</Arguments>" +
+        "    <Exec><Command>" + command + "</Command><Arguments>" + args + "</Arguments>" +
         "<WorkingDirectory>" + dir + "</WorkingDirectory></Exec>\r\n" +
         "  </Actions>\r\n" +
         "</Task>\r\n";

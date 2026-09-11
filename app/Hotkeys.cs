@@ -50,6 +50,12 @@ namespace LightRecorder {
         string accel = hotkeys.Get(name);
         if (string.IsNullOrEmpty(accel)) continue;
 
+        // The show/hide shortcut belongs to the listener, which has to own
+        // it to bring the app back after the app has quit. Registering it
+        // here as well would only fail, or - if this process won the race -
+        // leave the listener with nothing.
+        if (name == "toggleOverlay" && Listener.Exists) continue;
+
         uint mods, vk;
         if (!TryParse(accel, out mods, out vk)) {
           Log.Warn("hotkey: could not parse " + accel + " for " + name);
@@ -262,5 +268,60 @@ namespace LightRecorder {
         try { DestroyHandle(); } catch (Exception) { }
       }
     }
+  }
+
+  /// <summary>
+  /// The hotkey listener: LightRecorderHotkey.exe, next to this executable.
+  ///
+  /// It is the process that stays resident so this one need not. It owns the
+  /// show/hide shortcut, brings the app up when that is pressed, and is what
+  /// "Start with Windows" actually starts. See listener\HotkeyListener.cs.
+  /// </summary>
+  internal static class Listener {
+
+    public const string ExeName = "LightRecorderHotkey.exe";
+    const string WindowTitle = "LightRecorderListener";
+    const uint WM_APP_RELOAD = 0x8000 + 1;
+
+    public static string ExePath {
+      get { return System.IO.Path.Combine(Paths.AppDir, ExeName); }
+    }
+
+    /// <summary>Is the listener installed next to the app? When it is, the
+    /// show/hide shortcut is its job.</summary>
+    public static bool Exists {
+      get { try { return System.IO.File.Exists(ExePath); } catch (Exception) { return false; } }
+    }
+
+    public static bool IsRunning {
+      get { return FindWindowEx(Native.HWND_MESSAGE, IntPtr.Zero, null, WindowTitle) != IntPtr.Zero; }
+    }
+
+    /// <summary>Start it if it is installed and not already running, so the
+    /// shortcut works after a manual launch too - not only after a logon.</summary>
+    public static void EnsureRunning() {
+      if (!Exists || IsRunning) return;
+      try {
+        var psi = new System.Diagnostics.ProcessStartInfo(ExePath);
+        psi.UseShellExecute = false;
+        psi.WorkingDirectory = Paths.AppDir;
+        System.Diagnostics.Process.Start(psi);
+        Log.Info("listener: started " + ExePath);
+      } catch (Exception err) {
+        Log.Warn("listener: could not start: " + err.Message);
+      }
+    }
+
+    /// <summary>The shortcut changed in Settings; have it re-read the file.</summary>
+    public static void Reload() {
+      IntPtr w = FindWindowEx(Native.HWND_MESSAGE, IntPtr.Zero, null, WindowTitle);
+      if (w != IntPtr.Zero) PostMessage(w, WM_APP_RELOAD, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string className, string windowName);
+
+    [DllImport("user32.dll")]
+    static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
   }
 }

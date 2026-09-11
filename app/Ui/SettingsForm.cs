@@ -505,8 +505,15 @@ namespace LightRecorder.Ui {
       } else if (autostart && autostartError != null) {
         text = "Windows would not let the app start itself at sign-in: " + autostartError +
                ". The shortcuts work now, but will not after a reboot.";
+      } else if (Listener.Exists) {
+        text = "A tiny listener owns " + HotkeyManager.Display(Settings.Current.Hotkeys.ToggleOverlay) +
+               " and Ctrl+Shift+R and starts the recorder when either is pressed; the recorder quits " +
+               "when you put the overlay away. " +
+               (autostart
+                 ? "The listener starts when you sign in, so that works straight after a reboot."
+                 : "Turn on \"Start with Windows\" to have the listener start when you sign in.");
       } else {
-        text = "Shortcuts are registered by the app itself - there is no separate listener to start. " +
+        text = "Shortcuts are registered by the app itself. " +
                (autostart
                  ? "It starts in the tray when you sign in, so they work straight after a reboot."
                  : "Turn on \"Start with Windows\" to keep them after a reboot.");

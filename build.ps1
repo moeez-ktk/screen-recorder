@@ -132,6 +132,37 @@ Set-Content -Path (Join-Path $outDir 'LightRecorder.exe.manifest') -Value $manif
 $size = [math]::Round((Get-Item $out).Length / 1KB, 1)
 if (-not $Quiet) { Write-Host "Built $out ($size KB)" -ForegroundColor Green }
 
+# ---------------------------------------------------------------- listener
+#
+# The hotkey listener is the one process that stays resident, so it is its own
+# tiny executable: no WinForms, no Drawing, one source file.
+
+$listenerSrc = Join-Path $root 'listener\HotkeyListener.cs'
+$listenerOut = Join-Path $outDir 'LightRecorderHotkey.exe'
+if (Test-Path $listenerSrc) {
+  $runningListener = Get-Process LightRecorderHotkey -ErrorAction SilentlyContinue
+  if ($runningListener) { $runningListener | Stop-Process -Force; Start-Sleep -Milliseconds 300 }
+
+  $listenerArgs = @(
+    '/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/debug-', '/langversion:5'
+    "/out:$listenerOut"
+    '/reference:System.dll'
+  )
+  if (Test-Path $icon) { $listenerArgs += "/win32icon:$icon" }
+  $listenerArgs += $listenerSrc
+
+  & $csc @listenerArgs 2>&1 |
+    Where-Object { $_ -notmatch 'only supports language versions up to C# 5' -and $_ -notmatch '^\s*$' -and $_ -notmatch 'This compiler is provided as part' } |
+    ForEach-Object { Write-Host $_ }
+  if ($LASTEXITCODE -ne 0) { throw "Listener compilation failed with exit code $LASTEXITCODE" }
+
+  $lsize = [math]::Round((Get-Item $listenerOut).Length / 1KB, 1)
+  if (-not $Quiet) { Write-Host "Built $listenerOut ($lsize KB)" -ForegroundColor Green }
+
+  # It was resident before the build stopped it, so put it back.
+  if ($runningListener) { Start-Process -FilePath $listenerOut }
+}
+
 if ($Run) {
   Get-Process LightRecorder -ErrorAction SilentlyContinue | Stop-Process -Force
   Start-Sleep -Milliseconds 300

@@ -118,6 +118,13 @@ namespace LightRecorder {
         _autoLevel = s.MicAutoLevel;
         _leveler.Reset();
         _limiter.Reset();
+        // Every take starts gated. This flag was once left set from the
+        // previous take, so the second recording's pacer ran before it had an
+        // anchor, poured a huge silence lead into a one-second queue, and then
+        // sat waiting for a timeline that was already hours behind it: one
+        // second of audio, video stalled behind it, and everything after the
+        // first take was a second long.
+        _emit = false;
         lock (_clockGate) { _anchor = 0; _pausedTicks = 0; _pauseStart = 0; _pauseEnd = 0; _paused = false; }
 
         var problems = new List<string>();
@@ -205,6 +212,7 @@ namespace LightRecorder {
     /// <summary>Frames of recorded time between the anchor and now.</summary>
     long TimelineFrames() {
       lock (_clockGate) {
+        if (_anchor == 0) return 0;                    // no timeline until ffmpeg is listening
         long now = Stopwatch.GetTimestamp();
         long ticks = now - _anchor - _pausedTicks;
         // The current pause, or the last one until it is folded in.
@@ -230,6 +238,7 @@ namespace LightRecorder {
       lock (_gate) {
         if (!_running) { Cleanup(); return; }
         _running = false;
+        _emit = false;
 
         Thread p = _pacer;
         _pacer = null;

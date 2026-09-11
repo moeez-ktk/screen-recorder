@@ -30,9 +30,13 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 Output is `build\LightRecorder.exe`. Add `-Run` to launch it, or `-Dev` for an
 unoptimised build with a console attached.
 
-Then just run it. It puts an icon in the tray, registers its shortcuts, and
-stays out of the way. It also arranges to start again, in the tray, every time
-you sign in, so the shortcuts survive a reboot. That is *Start with Windows* in
+Output is two executables: `LightRecorder.exe`, the recorder, and
+`LightRecorderHotkey.exe`, a 22 KB listener that is the only thing meant to stay
+resident. The listener owns the show/hide shortcut and starts the recorder
+when it is pressed; the recorder quits again when you put its overlay away, so
+the process that costs anything only exists while you are using it. Run either
+one: the recorder starts the listener if it is not already up, and arranges for
+the listener to start every time you sign in. That is *Start with Windows* in
 Settings → Shortcuts, on by default, and it is a per-user Task Scheduler task
 named "Light Recorder" rather than a Run-key entry — Troubleshooting says why.
 
@@ -41,7 +45,11 @@ named "Light Recorder" rather than a Run-key entry — Troubleshooting says why.
 ## The shortcut
 
 **`Ctrl+Shift+D` shows the recorder.** Press it and the overlay appears in the
-top-right, ready to record. Press it again to dismiss it.
+top-right, ready to record. Press it again to dismiss it — which, with the
+listener running, also quits the recorder process until the next press.
+`Ctrl+Shift+R` does the same and is always registered, so there is a way in
+even if the first has been rebound to something unexpected; note that it is
+also the browsers' hard-reload key, which it shadows while the listener runs.
 
 > A global hotkey is claimed system-wide, so `Ctrl+Shift+D` will shadow
 > **VS Code's Run and Debug panel** and Chrome's *Bookmark all tabs* for as long
@@ -49,7 +57,8 @@ top-right, ready to record. Press it again to dismiss it.
 
 | Shortcut | Does |
 | --- | --- |
-| **`Ctrl+Shift+D`** | **Show the recorder** / dismiss it again |
+| **`Ctrl+Shift+D`** | **Show the recorder** / dismiss it again (owned by the listener) |
+| `Ctrl+Shift+R` | The same, always registered |
 | `Ctrl+Alt+S` | Start or stop recording |
 | `Alt+Shift+P` | Pause / resume recording |
 | `Ctrl+Alt+X` | Stop recording |
@@ -57,8 +66,8 @@ top-right, ready to record. Press it again to dismiss it.
 | `Ctrl+Alt+P` | Choose what to record |
 
 All are rebindable in Settings and work from any application, including from
-inside a fullscreen game. They act immediately — there is nothing to launch
-first.
+inside a fullscreen game. The show/hide shortcut is registered by the
+listener, the rest by the recorder while it runs.
 
 If another application already owns a combination, Windows silently refuses to
 register it and the shortcut simply never fires. Settings → Shortcuts says so
@@ -68,8 +77,10 @@ plainly rather than leaving you to guess.
 
 ## What it costs
 
-One process. It owns the hotkeys, the tray icon, the overlay, the audio capture
-and the browser bridge, and it is the only thing that stays resident.
+One process while you are using it, owning the hotkeys, the tray icon, the
+overlay, the audio capture and the browser bridge — and none at all
+otherwise, bar the listener, which is a message loop blocked in `GetMessage`
+at about 3 MB resident.
 
 Measured on an RTX 2060 Super at 1080p60, comparing against the Electron build
 this replaces:
@@ -306,7 +317,7 @@ app/            Program.cs        entry point, single instance, IPC
                 Dxgi.cs           output enumeration for ddagrab
                 Bridge.cs         extension protocol
                 WebSocketServer.cs  RFC 6455, ~400 lines, no dependencies
-                Hotkeys.cs        RegisterHotKey, accelerators
+                Hotkeys.cs        RegisterHotKey, accelerators, the listener handshake
                 Autostart.cs      the logon task behind Start with Windows
                 Settings.cs       persisted settings
                 Json.cs           a JSON reader and writer in one file
@@ -319,6 +330,7 @@ app/Ui/         Theme.cs          the design tokens from the old theme.css
                 Widgets.cs        drawn switch, slider, select, button
                 OverlayForm.cs, MixerWindow.cs, PickerForm.cs,
                 SettingsForm.cs, Toasts.cs
+listener/       HotkeyListener.cs  the resident hotkey listener, one file, no WinForms
 extension/      MV3 bridge: tabs, per-tab mute, tab capture
 assets/         make-icon.ps1 generates the app icon
 legacy/         the previous Electron implementation, kept for reference

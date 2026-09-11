@@ -84,6 +84,10 @@ namespace LightRecorder {
       // recorder appearing on screen at every sign-in.
       if (!atLogon) _overlay.ShowInactive();
 
+      // The listener owns the show/hide shortcut and is what starts this
+      // process when it is pressed. A manual launch makes sure it is up too.
+      if (s.StartWithWindows) Listener.EnsureRunning();
+
       // Checked on every start, so a copy of the app that has moved re-points
       // the task and a lost registration repairs itself.
       _autostartChanged = delegate { Post(NotifyState); };
@@ -293,6 +297,15 @@ namespace LightRecorder {
       CloseMixer();
       if (_overlay != null) { _overlay.ClearSaved(); _overlay.Hide(); }
       if (_toasts != null) _toasts.Hide();
+
+      // With the listener resident there is no reason for this process to be:
+      // the shortcut brings it straight back. Windows the user still has open
+      // keep it alive until they are closed.
+      if (!IsRecording && Listener.IsRunning &&
+          (_picker == null || _picker.IsDisposed) && (_settings == null || _settings.IsDisposed)) {
+        Quit();
+        return;
+      }
       // Sitting in the tray should cost as close to nothing as possible.
       Native.TrimWorkingSet();
     }
@@ -800,6 +813,7 @@ namespace LightRecorder {
     /// <summary>Re-register hotkeys after the user edits them.</summary>
     public void ReapplyHotkeys() {
       _hotkeys.Apply(Settings.Current.Hotkeys);
+      Listener.Reload();               // the show/hide key is its to re-register
       ReportHotkeyConflicts();
       NotifyState();
     }

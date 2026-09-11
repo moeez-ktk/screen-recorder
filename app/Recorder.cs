@@ -675,9 +675,13 @@ namespace LightRecorder {
       if (line.Length == 0) return;
       // Pause and resume go through ffmpeg's interactive command prompt, which
       // answers on stderr. Those lines are not problems, and keeping them
-      // would push a real error out of the tail.
-      if (line.StartsWith("Enter command:", StringComparison.Ordinal) ||
-          line.StartsWith("Command reply", StringComparison.Ordinal)) return;
+      // would push a real error out of the tail - unless the reply says the
+      // command was refused, which is worth knowing about.
+      if (line.StartsWith("Enter command:", StringComparison.Ordinal)) return;
+      if (line.StartsWith("Command reply", StringComparison.Ordinal)) {
+        if (line.IndexOf("ret:0", StringComparison.Ordinal) < 0) Log.AppendRecording("pause   : ffmpeg refused a command: " + line + "\n");
+        return;
+      }
       lock (_stderrTail) {
         _stderrTail.Add(e.Data);
         if (_stderrTail.Count > 40) _stderrTail.RemoveAt(0);   // bounded: never grows
