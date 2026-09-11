@@ -60,6 +60,8 @@ namespace LightRecorder {
     public event Action TabCaptureStopped;
     public event Action<string> TabCaptureError;
     public event Action<int> TabRecordingStarting;  // tabId
+    /// <summary>A chunk-carrying connection went away.</summary>
+    public event Action DataClosed;
 
     public bool IsConnected {
       get { WebSocketConnection c = _control; return c != null && c.IsOpen; }
@@ -160,17 +162,15 @@ namespace LightRecorder {
     }
 
     void OnClosed(WebSocketConnection c) {
-      bool wasControl = false;
+      bool wasControl = false, wasData = false;
       lock (_gate) {
         Timer t;
         if (_authTimers.TryGetValue(c, out t)) { t.Dispose(); _authTimers.Remove(c); }
-        _dataClients.Remove(c);
+        wasData = _dataClients.Remove(c);
         if (_control == c) { _control = null; Tabs = new List<TabInfo>(); wasControl = true; }
       }
-      if (wasControl) {
-        Action h = Disconnected;
-        if (h != null) h();
-      }
+      if (wasControl) Fire(Disconnected);
+      if (wasData) Fire(DataClosed);
     }
 
     void OnBinary(WebSocketConnection c, byte[] data, int count) {

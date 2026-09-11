@@ -79,6 +79,10 @@ namespace LightRecorder.Ui {
       });
     }
 
+    /// <summary>The footer locks while a recording runs and unlocks when it
+    /// stops, so it has to follow the app's state.</summary>
+    public void OnStateChanged() { Invalidate(); }
+
     static void DisposeAll(List<Source> list) {
       if (list == null) return;
       foreach (Source s in list) s.DisposeImages();
@@ -361,9 +365,15 @@ namespace LightRecorder.Ui {
       using (var b = new SolidBrush(Theme.BgPanel)) g.FillRectangle(b, r);
       using (var pen = new Pen(Theme.Border, 1f)) g.DrawLine(pen, r.X, r.Y, r.Right, r.Y);
 
-      string label = _chosen != null ? _chosen.Label : "Nothing selected";
-      Theme.Text(g, label, Theme.Get(Dpi.S(12f), FontStyle.Regular), Theme.FgDim,
-                 new RectangleF(Dpi.S(16), r.Y, Dpi.S(320), h));
+      // The source cannot change under a running take: the capture is bound
+      // to it, so a new choice would only relabel the overlay while the old
+      // source kept recording.
+      bool recording = _app.IsRecording;
+      bool canApply = _chosen != null && !recording;
+      string label = recording ? "Recording - stop before changing the source"
+                   : _chosen != null ? _chosen.Label : "Nothing selected";
+      Theme.Text(g, label, Theme.Get(Dpi.S(12f), FontStyle.Regular), recording ? Theme.Warn : Theme.FgDim,
+                 new RectangleF(Dpi.S(16), r.Y, Dpi.S(360), h));
 
       int bh = Dpi.S(32);
       int y = r.Y + (h - bh) / 2;
@@ -372,13 +382,13 @@ namespace LightRecorder.Ui {
       int recordW = Dpi.S(112);
       x -= recordW;
       var record = new Rectangle(x, y, recordW, bh);
-      AddHit("record", record, _chosen != null, null);
+      AddHit("record", record, canApply, null);
       x -= Dpi.S(8);
 
       int useW = Dpi.S(126);
       x -= useW;
       var use = new Rectangle(x, y, useW, bh);
-      AddHit("use", use, _chosen != null, null);
+      AddHit("use", use, canApply, null);
       x -= Dpi.S(8);
 
       int cancelW = Dpi.S(76);
@@ -389,9 +399,9 @@ namespace LightRecorder.Ui {
       Widgets.DrawButton(g, cancel, "Cancel", Widgets.ButtonStyle.Normal,
                           Hovered == "cancel", PressedId == "cancel", true, Dpi);
       Widgets.DrawButton(g, use, "Use this source", Widgets.ButtonStyle.Primary,
-                          Hovered == "use", PressedId == "use", _chosen != null, Dpi);
+                          Hovered == "use", PressedId == "use", canApply, Dpi);
       Widgets.DrawButton(g, record, "Record now", Widgets.ButtonStyle.Primary,
-                          Hovered == "record", PressedId == "record", _chosen != null, Dpi);
+                          Hovered == "record", PressedId == "record", canApply, Dpi);
     }
 
     // --------------------------------------------------------------- actions
@@ -425,7 +435,7 @@ namespace LightRecorder.Ui {
     }
 
     void Apply() {
-      if (_chosen == null) return;
+      if (_chosen == null || _app.IsRecording) return;
       // The picker's copy owns bitmaps that die with this window, so the app
       // gets a detached one.
       var s = new Source();
@@ -449,7 +459,7 @@ namespace LightRecorder.Ui {
     protected override void OnKeyDown(KeyEventArgs e) {
       base.OnKeyDown(e);
       if (e.KeyCode == Keys.Escape) Close();
-      else if (e.KeyCode == Keys.Enter && _chosen != null) { Apply(); Close(); _app.StartRecording(); }
+      else if (e.KeyCode == Keys.Enter && _chosen != null && !_app.IsRecording) { Apply(); Close(); _app.StartRecording(); }
       else if (e.KeyCode == Keys.F5) LoadSources();
     }
 

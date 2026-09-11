@@ -118,11 +118,23 @@ appear in your own recordings.
 A pause leaves the paused stretch out of the file entirely: one file, one
 encoder session, and stopping is still instant. There is no gap and no frozen
 frame at the join, and sound and picture stay lined up across any number of
-pauses — measured by flashing a square and playing a click together, the offset
-after a pause matches the offset before it to within a frame.
+pauses — measured by flashing a square and playing a click together across two
+pause cycles, every offset lands within the same 20 ms band before, between and
+after them.
+
+Each edge is placed a quarter of a second ahead rather than "now": ffmpeg only
+polls for commands every hundred milliseconds or so, and cutting the video
+whenever it happened to notice — while the audio cut on the instant — would
+have drifted the two by a random tenth of a second per pause. Instead the
+video filter is told the wall-clock instant and keeps or discards each frame by
+its own capture time, and the audio pacer stops at that same instant.
 
 Recording a single browser tab pauses in the browser, where MediaRecorder does
 it natively. Reload the extension after updating the app to pick that up.
+
+The source cannot be changed mid-take. The picker still opens while recording,
+but its buttons lock until you stop — the capture is bound to what it started
+on, and a new choice would only have relabelled the overlay.
 
 ---
 

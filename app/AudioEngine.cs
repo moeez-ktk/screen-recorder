@@ -67,12 +67,18 @@ namespace LightRecorder {
     /// instant the recorder launched ffmpeg, which the video timestamps count
     /// from too - and leaves out every pause, so the track simply has no time
     /// in it for one. The video side does the same by discarding frames, and
-    /// the two stay aligned across any number of pauses. Guarded because the
-    /// UI thread pauses while the pacer is reading.
+    /// the two stay aligned across any number of pauses.
+    ///
+    /// Pause and resume edges are instants handed in by the recorder, a little
+    /// in the future, so the pacer reaches them on its own clock rather than
+    /// being interrupted: the edge lands on a sample, not on whenever the UI
+    /// thread got there. Guarded because the UI thread sets them while the
+    /// pacer is reading.
     /// </summary>
     readonly object _clockGate = new object();
     long _anchor;
-    long _pausedTicks, _pauseStarted;
+    long _pausedTicks;                   // finished pauses
+    long _pauseStart, _pauseEnd;         // the current or last pause; end is 0 while open
     bool _paused;
 
     /// <summary>Set on resume, so the first samples after a pause slide in
@@ -112,7 +118,7 @@ namespace LightRecorder {
         _autoLevel = s.MicAutoLevel;
         _leveler.Reset();
         _limiter.Reset();
-        lock (_clockGate) { _anchor = 0; _pausedTicks = 0; _paused = false; }
+        lock (_clockGate) { _anchor = 0; _pausedTicks = 0; _pauseStart = 0; _pauseEnd = 0; _paused = false; }
 
         var problems = new List<string>();
 
@@ -176,24 +182,23 @@ namespace LightRecorder {
 
     /// <summary>Stop the timeline. Nothing is emitted until Resume, so the
     /// track has no time in it for the pause.</summary>
-    public void Pause() {
+    /// <summary>Stop the timeline at <paramref name="edgeTicks"/>.</summary>
+    public void Pause(long edgeTicks) {
       lock (_clockGate) {
         if (_paused) return;
+        if (_pauseEnd != 0) { _pausedTicks += _pauseEnd - _pauseStart; _pauseEnd = 0; }
         _paused = true;
-        _pauseStarted = Stopwatch.GetTimestamp();
+        _pauseStart = edgeTicks;
       }
     }
 
-    public void Resume() {
+    /// <summary>Start it again at <paramref name="edgeTicks"/>. The pacer
+    /// discards what the devices heard in between when it gets there.</summary>
+    public void Resume(long edgeTicks) {
       lock (_clockGate) {
         if (!_paused) return;
-        // What the devices heard while paused is not part of the recording.
-        WasapiCapture sys = _system, mic = _mic;
-        if (sys != null) sys.Flush();
-        if (mic != null) mic.Flush();
-        _pausedTicks += Stopwatch.GetTimestamp() - _pauseStarted;
         _paused = false;
-        _rampFromSilence = true;
+        _pauseEnd = Math.Max(edgeTicks, _pauseStart);
       }
     }
 
@@ -201,8 +206,23 @@ namespace LightRecorder {
     long TimelineFrames() {
       lock (_clockGate) {
         long now = Stopwatch.GetTimestamp();
-        long ticks = now - _anchor - _pausedTicks - (_paused ? now - _pauseStarted : 0);
+        long ticks = now - _anchor - _pausedTicks;
+        // The current pause, or the last one until it is folded in.
+        if (_paused || _pauseEnd != 0) {
+          long end = _paused ? now : Math.Min(now, _pauseEnd);
+          if (end > _pauseStart) ticks -= end - _pauseStart;
+        }
         return (long)((double)ticks * Rate / Stopwatch.Frequency);
+      }
+    }
+
+    /// <summary>True from the pause edge until the resume edge has passed,
+    /// which is when the pacer flushes the rings and eases back in.</summary>
+    bool InPause() {
+      lock (_clockGate) {
+        long now = Stopwatch.GetTimestamp();
+        if (now < _pauseStart) return false;
+        return _paused || (_pauseEnd != 0 && now < _pauseEnd);
       }
     }
 
@@ -216,7 +236,7 @@ namespace LightRecorder {
         if (p != null) { try { p.Join(500); } catch (Exception) { } }
 
         Cleanup();
-        lock (_clockGate) { _anchor = 0; _pausedTicks = 0; _paused = false; }
+        lock (_clockGate) { _anchor = 0; _pausedTicks = 0; _pauseStart = 0; _pauseEnd = 0; _paused = false; }
       }
     }
 
@@ -260,7 +280,22 @@ namespace LightRecorder {
       // How far the gain may travel per frame during a mute/unmute ramp.
       float step = (float)(1.0 / (RampSeconds * Rate));
 
+      bool wasPaused = false;
       while (_running) {
+        bool paused = InPause();
+        if (paused && !wasPaused) {
+          // Whatever the timeline still owes up to the edge goes out now, so
+          // the track stops on the edge and not a few milliseconds short.
+          wasPaused = true;
+        } else if (!paused && wasPaused) {
+          // What the devices heard while paused is not part of the recording.
+          WasapiCapture flushSys = _system, flushMic = _mic;
+          if (flushSys != null) flushSys.Flush();
+          if (flushMic != null) flushMic.Flush();
+          _rampFromSilence = true;
+          wasPaused = false;
+        }
+
         long target = TimelineFrames();
         long need = target - emitted;
 

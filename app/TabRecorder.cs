@@ -120,8 +120,14 @@ namespace LightRecorder {
         try { s.Dispose(); } catch (Exception) { }
       }
 
+      // Nothing arrived - capture never started, or the tab was refused. An
+      // empty file next to the real recordings is only confusing.
+      if (Bytes == 0 && !string.IsNullOrEmpty(OutFile)) {
+        try { File.Delete(OutFile); } catch (Exception) { }
+      }
+
       // Rename if the browser gave us WebM after we optimistically said mp4.
-      if (!string.IsNullOrEmpty(_actualExt) && !string.IsNullOrEmpty(OutFile) &&
+      if (Bytes > 0 && !string.IsNullOrEmpty(_actualExt) && !string.IsNullOrEmpty(OutFile) &&
           !OutFile.EndsWith("." + _actualExt, StringComparison.OrdinalIgnoreCase)) {
         try {
           string renamed = Path.ChangeExtension(OutFile, "." + _actualExt);

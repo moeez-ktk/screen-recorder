@@ -117,13 +117,11 @@ async function handle(msg) {
       break;
 
     case 'pauseTabCapture':
+      toOffscreen('pause');
+      break;
+
     case 'resumeTabCapture':
-      if (capturingTabId != null) {
-        chrome.runtime.sendMessage({
-          target: 'offscreen',
-          type: msg.type === 'pauseTabCapture' ? 'pause' : 'resume'
-        });
-      }
+      toOffscreen('resume');
       break;
   }
 }
@@ -193,10 +191,21 @@ async function startCapture(tabId, opts, fromGesture) {
   }
 }
 
+/**
+ * Control messages go to the offscreen document whenever one exists, not only
+ * when this worker remembers starting it: the worker can be evicted and
+ * restarted mid-recording with capturingTabId back at null, while the
+ * offscreen document - which holds the recorder - is still running.
+ */
+async function toOffscreen(type) {
+  try {
+    if (await chrome.offscreen.hasDocument()) chrome.runtime.sendMessage({ target: 'offscreen', type });
+  } catch (_) { /* no document, nothing to tell */ }
+}
+
 function stopCapture() {
-  if (capturingTabId == null) return;
-  chrome.runtime.sendMessage({ target: 'offscreen', type: 'stop' });
   capturingTabId = null;
+  toOffscreen('stop');
 }
 
 // Messages coming back from the offscreen document.

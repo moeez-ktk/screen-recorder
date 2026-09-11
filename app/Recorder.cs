@@ -390,12 +390,40 @@ namespace LightRecorder {
     /// that also takes off the time spent paused, so the file carries straight
     /// on: no gap, no frozen frame, one encoder session, one file, and
     /// stopping stays instant.
+    ///
+    /// ffmpeg only reads its command queue every hundred milliseconds or so,
+    /// and applying the swap the moment it arrives would cut the video that
+    /// much later than the audio, by an amount that differs at every pause -
+    /// a random tenth of a second of drift per pause. So neither edge is "now".
+    /// Each expression names the wall-clock instant it takes effect at, a
+    /// quarter of a second ahead, and decides per frame from the frame's own
+    /// capture time; the audio pacer is given the same instant. Both tracks
+    /// then cut at the identical moment however late ffmpeg got round to it.
     /// </summary>
     static string PtsFilter(double offsetSeconds) { return "setpts=" + PtsExpr(offsetSeconds); }
 
     static string PtsExpr(double offsetSeconds) {
-      return "PTS-" + offsetSeconds.ToString("0.000000", CultureInfo.InvariantCulture) + "/TB";
+      return "PTS-" + Sec(offsetSeconds) + "/TB";
     }
+
+    /// <summary>Frames captured from <paramref name="at"/> on get one mapping,
+    /// earlier ones the other. T is the frame's capture time in seconds. Only
+    /// ever sent as a runtime command, where the argument is the rest of the
+    /// line and commas need no escaping - inside -filter_complex they would.</summary>
+    static string SplitPtsExpr(double at, double offsetBefore, double offsetAfter) {
+      return "if(gte(T," + Sec(at) + "),PTS-" + Sec(offsetAfter) + "/TB,PTS-" + Sec(offsetBefore) + "/TB)";
+    }
+
+    static string Sec(double seconds) { return seconds.ToString("0.000000", CultureInfo.InvariantCulture); }
+
+    /// <summary>How far ahead a pause or resume edge is placed. Comfortably
+    /// past the worst case of ffmpeg's command polling, and still short enough
+    /// that the button feels immediate.</summary>
+    public const int EdgeLeadMs = 250;
+
+    /// <summary>A million seconds behind where the frame belongs: far behind
+    /// anything already written.</summary>
+    const double Discard = 1000000;
 
     /// <summary>The instant both tracks count from, on the two clocks that
     /// need it: Stopwatch ticks for the audio pacer, wall-clock seconds for
@@ -404,29 +432,34 @@ namespace LightRecorder {
     double _anchorSeconds;
 
     bool _paused;
-    long _pauseStarted;                  // Stopwatch timestamp
+    long _pauseStarted;                  // Stopwatch timestamp of the pause edge
     long _pausedTicks;                   // finished pauses, in Stopwatch ticks
 
     public bool IsPaused { get { return _paused; } }
 
-    public bool Pause() {
+    /// <summary>
+    /// Pause from <paramref name="edgeTicks"/> (a Stopwatch timestamp, a
+    /// little in the future) - the same instant the audio pacer is told to
+    /// stop at. <paramref name="edgeSeconds"/> is that instant on the wall
+    /// clock the frames are stamped with.
+    /// </summary>
+    public bool Pause(long edgeTicks, double edgeSeconds) {
       if (State != RecState.Recording || _paused) return false;
       _paused = true;
-      _pauseStarted = Stopwatch.GetTimestamp();
-      // A million seconds behind where the frame belongs: far behind anything
-      // already written.
-      SendPtsExpression(PtsExpr(_anchorSeconds + 1000000));
+      _pauseStarted = edgeTicks;
+      double offset = _anchorSeconds + (double)_pausedTicks / Stopwatch.Frequency;
+      SendPtsExpression(SplitPtsExpr(edgeSeconds, offset, _anchorSeconds + Discard));
       return true;
     }
 
-    public bool Resume() {
+    public bool Resume(long edgeTicks, double edgeSeconds) {
       if (State != RecState.Recording || !_paused) return false;
-      _pausedTicks += Stopwatch.GetTimestamp() - _pauseStarted;
+      _pausedTicks += edgeTicks - _pauseStarted;
       _paused = false;
       // Measured on the clock the audio pacer stops and starts, so both
       // tracks leave out the same amount of time.
-      double seconds = (double)_pausedTicks / Stopwatch.Frequency;
-      SendPtsExpression(PtsExpr(_anchorSeconds + seconds));
+      double offset = _anchorSeconds + (double)_pausedTicks / Stopwatch.Frequency;
+      SendPtsExpression(SplitPtsExpr(edgeSeconds, _anchorSeconds + Discard, offset));
       return true;
     }
 
@@ -444,7 +477,8 @@ namespace LightRecorder {
     /// <summary>Time actually recorded: since the start, less every pause,
     /// including one in progress.</summary>
     long ActiveMs() {
-      long paused = _pausedTicks + (_paused ? Stopwatch.GetTimestamp() - _pauseStarted : 0);
+      long paused = _pausedTicks;
+      if (_paused) paused += Math.Max(0, Stopwatch.GetTimestamp() - _pauseStarted);
       return (long)(DateTime.UtcNow - StartedAt).TotalMilliseconds - paused * 1000 / Stopwatch.Frequency;
     }
 

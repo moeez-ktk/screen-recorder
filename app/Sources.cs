@@ -274,6 +274,7 @@ namespace LightRecorder {
       s.Width = visible.Width;
       s.Height = visible.Height;
       s.Title = Native.WindowTitle(s.Handle);
+      if (!string.IsNullOrEmpty(s.Title)) s.Name = s.Title;    // the overlay shows what is being recorded now
       return true;
     }
 

@@ -194,6 +194,7 @@ namespace LightRecorder {
       if (_overlay != null) _overlay.OnStateChanged();
       if (_mixer != null && !_mixer.IsDisposed) _mixer.OnStateChanged();
       if (_settings != null && !_settings.IsDisposed) _settings.OnStateChanged();
+      if (_picker != null && !_picker.IsDisposed) _picker.OnStateChanged();
     }
 
     public void Toast(string message, ToastKind kind) {
@@ -427,7 +428,14 @@ namespace LightRecorder {
       ProgressBytes = 0;
       // Recording one tab means only that tab's audio is captured, so tab B is
       // silent in the file without muting anything the user can hear.
-      Bridge.StartTabCapture(CurrentSource.TabId, s);
+      if (!Bridge.StartTabCapture(CurrentSource.TabId, s)) {
+        // Connected a moment ago and gone now. Better told than left with a
+        // timer running over an empty file.
+        ActiveMode = null;
+        TabRec.Stop();
+        Toast("The browser extension disconnected before capture could start.", ToastKind.Error);
+        return;
+      }
       SetTrayState();
       SetCompact(true);
       NotifyState();
@@ -494,18 +502,20 @@ namespace LightRecorder {
       if (!IsRecording) return;
 
       if (ActiveMode == "tab") {
-        if (TabRec.IsPaused) { Bridge.ResumeTabCapture(); TabRec.Resume(); }
-        else { Bridge.PauseTabCapture(); TabRec.Pause(); }
-      } else if (!Rec.IsPaused) {
-        if (Rec.State != Recorder.RecState.Recording) return;
-        // Audio first on the way in and on the way out, so the time the pacer
-        // stands still and the offset ffmpeg is told to close measure the
-        // same stretch, to within microseconds.
-        Audio.Pause();
-        Rec.Pause();
+        // The browser does the pausing. If it cannot be told, the file keeps
+        // growing, so the clock must not pretend otherwise.
+        bool ok = TabRec.IsPaused ? Bridge.ResumeTabCapture() : Bridge.PauseTabCapture();
+        if (!ok) { Toast("The browser extension is not responding, so the tab cannot be paused.", ToastKind.Warn); return; }
+        if (TabRec.IsPaused) TabRec.Resume(); else TabRec.Pause();
       } else {
-        Audio.Resume();
-        Rec.Resume();
+        if (Rec.State != Recorder.RecState.Recording) return;
+        // One edge, a moment ahead, read on both clocks at the same instant:
+        // the pacer stops or starts at it, and ffmpeg keeps or discards each
+        // frame by whether it was captured before or after it.
+        long edgeTicks = Stopwatch.GetTimestamp() + Recorder.EdgeLeadMs * Stopwatch.Frequency / 1000;
+        double edgeSeconds = Native.PreciseEpochSeconds() + Recorder.EdgeLeadMs / 1000.0;
+        if (!Rec.IsPaused) { Audio.Pause(edgeTicks); Rec.Pause(edgeTicks, edgeSeconds); }
+        else { Audio.Resume(edgeTicks); Rec.Resume(edgeTicks, edgeSeconds); }
       }
 
       SetTrayState();
@@ -634,12 +644,30 @@ namespace LightRecorder {
         Post(delegate { if (ActiveMode == "tab" && TabRec.IsRecording) StopRecording(); });
       };
 
+      // The chunks come over their own socket. If that drops mid-take - the
+      // browser closed, the extension reloaded - nothing else would say so,
+      // and the timer would keep counting over a file that stopped growing.
+      Bridge.DataClosed += delegate {
+        Post(delegate {
+          if (ActiveMode != "tab" || !TabRec.IsRecording) return;
+          Toast("The browser stopped sending the tab. Saving what arrived.", ToastKind.Warn);
+          StopRecording();
+        });
+      };
+
       // The user pressed "Record this tab" in the extension popup. Chrome only
       // permits tab capture from a real click inside the extension, so this
       // path is browser-initiated and the app just opens the output file.
       Bridge.TabRecordingStarting += delegate (int tabId) {
         Post(delegate {
-          if (IsRecording) return;
+          // The extension has already begun capturing by the time this
+          // arrives; if the app cannot take the stream, it has to say stop, or
+          // the browser carries on encoding a tab nobody is writing to disk.
+          if (IsRecording) {
+            Bridge.StopTabCapture();
+            Toast("Already recording - stop first to record that tab.", ToastKind.Warn);
+            return;
+          }
           TabInfo tab = Bridge.FindTab(tabId);
 
           var src = new Source();
@@ -651,6 +679,7 @@ namespace LightRecorder {
 
           string error;
           if (!TabRec.Start(Settings.Current, out error)) {
+            Bridge.StopTabCapture();
             Toast("Could not start tab recording: " + error, ToastKind.Error);
             return;
           }
