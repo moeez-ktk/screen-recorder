@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Light Recorder capture</title>
+<!--
+  Offscreen document: encodes the captured tab and streams it to the desktop
+  app. Never visible. The <audio> element exists so capturing a tab does not
+  silence it for the person watching.
+-->
+<body>
+  <audio id="monitor" autoplay></audio>
+  <script src="offscreen.js"></script>
+</body>

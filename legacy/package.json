@@ -1,0 +1,35 @@
+{
+  "name": "lightshot-recorder",
+  "productName": "Light Recorder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Extremely lightweight streaming screen recorder for Windows",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "icons": "node assets/build-icons.js",
+    "listener:build": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-listener.ps1",
+    "listener:start": "node tools/listener-cli.js --start",
+    "listener:status": "node tools/listener-cli.js --status",
+    "listener:autostart": "node tools/listener-cli.js --install",
+    "listener:autostart-off": "node tools/listener-cli.js --uninstall",
+    "dist": "electron-builder --win nsis"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.vexadus.lightrecorder",
+    "files": ["src/**/*", "assets/*.png", "assets/*.ico", "!**/*.map"],
+    "extraResources": [
+      { "from": "tools/LightRecorderHotkey.exe", "to": "tools/LightRecorderHotkey.exe" }
+    ],
+    "win": { "target": ["nsis"], "icon": "assets/icon.ico" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+  }
+}

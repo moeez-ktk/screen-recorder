@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Settings</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="settings.css">
+<body>
+  <div class="titlebar">
+    <h1>Settings</h1>
+    <div class="grow"></div>
+    <button class="icon-btn" id="btnClose" title="Close" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
+  <main>
+    <!-- ---------------------------------------------------------- output -->
+    <section>
+      <h2>Where recordings go</h2>
+      <div class="field">
+        <label for="outputDir">Save folder</label>
+        <div class="row">
+          <input type="text" id="outputDir" class="grow" readonly>
+          <button class="btn" id="btnFolder">Change…</button>
+          <button class="btn" id="btnOpenFolder">Open</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="filenamePattern">File name</label>
+        <input type="text" id="filenamePattern">
+        <div class="hint"><code>{date}</code> and <code>{time}</code> are filled in. A number is appended if the name is already taken.</div>
+      </div>
+      <div class="field row">
+        <label class="switch"><input type="checkbox" id="remuxOnStop"><span></span></label>
+        <div class="grow">
+          <div>Optimise for video editors when stopping</div>
+          <div class="hint">Recordings are already valid MP4 files that survive a crash. This adds a fast stream-copy pass so the file also seeks instantly in editors — it delays stopping by a few seconds on long recordings.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ----------------------------------------------------------- video -->
+    <section>
+      <h2>Video</h2>
+      <div class="two">
+        <div class="field">
+          <label for="fps">Frame rate</label>
+          <select id="fps">
+            <option value="24">24 fps</option>
+            <option value="30">30 fps</option>
+            <option value="48">48 fps</option>
+            <option value="60">60 fps</option>
+            <option value="120">120 fps</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="resolution">Resolution</label>
+          <select id="resolution">
+            <option value="source">Native (no scaling)</option>
+            <option value="2160">2160p / 4K</option>
+            <option value="1440">1440p</option>
+            <option value="1080">1080p</option>
+            <option value="720">720p</option>
+            <option value="480">480p</option>
+          </select>
+          <div class="hint">Never upscales beyond the source.</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="encoder">Encoder</label>
+        <select id="encoder"></select>
+        <div class="hint" id="encoderHint"></div>
+      </div>
+
+      <div class="two">
+        <div class="field">
+          <label for="qualityMode">Quality mode</label>
+          <select id="qualityMode">
+            <option value="quality">Constant quality</option>
+            <option value="bitrate">Fixed bitrate</option>
+          </select>
+        </div>
+        <div class="field" id="qualityWrap">
+          <label for="quality">Quality <span class="val" id="qualityVal"></span></label>
+          <input type="range" id="quality" min="14" max="34" step="1">
+          <div class="hint">Lower is better quality and a larger file.</div>
+        </div>
+        <div class="field" id="bitrateWrap" hidden>
+          <label for="bitrateMbps">Bitrate <span class="val" id="bitrateVal"></span></label>
+          <input type="range" id="bitrateMbps" min="2" max="60" step="1">
+        </div>
+      </div>
+
+      <div class="field row">
+        <label class="switch"><input type="checkbox" id="captureCursor"><span></span></label>
+        <div class="grow">Include the mouse cursor</div>
+      </div>
+    </section>
+
+    <!-- ----------------------------------------------------------- audio -->
+    <section>
+      <h2>Audio</h2>
+      <div class="field row">
+        <label class="switch"><input type="checkbox" id="systemAudioEnabled"><span></span></label>
+        <div class="grow">
+          <div>Record system audio</div>
+          <div class="hint">Everything playing on this PC: games, browser, music.</div>
+        </div>
+      </div>
+      <div class="field row">
+        <label class="switch"><input type="checkbox" id="micEnabled"><span></span></label>
+        <div class="grow">Record microphone</div>
+      </div>
+      <div class="field">
+        <label for="micDeviceId">Microphone</label>
+        <select id="micDeviceId"><option value="default">System default</option></select>
+      </div>
+      <div class="two">
+        <div class="field">
+          <label for="systemAudioGain">System volume <span class="val" id="sysGainVal"></span></label>
+          <input type="range" id="systemAudioGain" min="0" max="2" step="0.05">
+        </div>
+        <div class="field">
+          <label for="micGain">Mic volume <span class="val" id="micGainVal"></span></label>
+          <input type="range" id="micGain" min="0" max="2" step="0.05">
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------- hotkeys -->
+    <section>
+      <h2>Shortcuts</h2>
+      <div class="hint" style="margin-bottom:10px">Click a field and press the combination you want. These work from any application.</div>
+      <div class="hk" id="hotkeys"></div>
+
+      <div class="listener" id="listenerBox">
+        <div class="row" style="align-items:flex-start">
+          <span class="dot-live" id="listenerDot"></span>
+          <div class="grow">
+            <div id="listenerState">Checking the hotkey listener…</div>
+            <div class="hint" id="listenerHint"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:9px">
+          <button class="btn" id="btnListenerStart">Start listener</button>
+          <div class="row" style="gap:7px;margin-left:auto">
+            <label class="switch"><input type="checkbox" id="listenerAutostart"><span></span></label>
+            <span style="font-size:12px">Start with Windows</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>When you are done</h2>
+      <div class="field row">
+        <label class="switch"><input type="checkbox" id="exitWhenHidden"><span></span></label>
+        <div class="grow">
+          <div>Close the recorder when the overlay is hidden</div>
+          <div class="hint">Keeps nothing heavy in the background between recordings. The hotkey listener stays behind to bring it back — it uses a few megabytes and no CPU.</div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="autoHideAfterStopSeconds">Hide the overlay after stopping <span class="val" id="autoHideVal"></span></label>
+        <input type="range" id="autoHideAfterStopSeconds" min="0" max="120" step="5">
+        <div class="hint">Set to 0 to leave the overlay up until you dismiss it yourself.</div>
+      </div>
+    </section>
+
+    <!-- -------------------------------------------------------- advanced -->
+    <section>
+      <h2>Advanced</h2>
+      <div class="field">
+        <label for="ffmpegPath">ffmpeg</label>
+        <div class="row">
+          <input type="text" id="ffmpegPath" class="grow" placeholder="Auto-detected" readonly>
+          <button class="btn" id="btnFfmpeg">Locate…</button>
+          <button class="btn" id="btnRedetect">Re-detect</button>
+        </div>
+        <div class="hint" id="ffmpegHint"></div>
+      </div>
+      <div class="field">
+        <label for="bridgePort">Browser extension port</label>
+        <div class="row">
+          <input type="number" id="bridgePort" min="1024" max="65535" style="max-width:120px">
+          <span class="hint grow" id="bridgeStatus"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Extension pairing token</label>
+        <div class="row">
+          <input type="text" id="bridgeToken" class="grow mono" readonly>
+          <button class="btn" id="btnCopyToken">Copy</button>
+          <button class="btn" id="btnExtFolder">Open folder</button>
+        </div>
+        <div class="hint">Paste this into the extension so only it can talk to the recorder.</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <button class="btn" id="btnReset">Reset to defaults</button>
+    <div class="grow"></div>
+    <button class="btn primary" id="btnDone">Done</button>
+  </footer>
+
+  <script src="common.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

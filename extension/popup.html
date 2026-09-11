@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Light Recorder</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    width: 300px; margin: 0; padding: 14px;
+    background: #14161a; color: #e8eaed;
+    font: 13px/1.45 "Segoe UI", system-ui, sans-serif;
+  }
+  h1 { font-size: 13px; margin: 0 0 10px; display: flex; align-items: center; gap: 7px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+  .dot.on { background: #34c759; }
+  .status { font-size: 11.5px; color: #9aa0a6; margin-bottom: 12px; line-height: 1.5; }
+  label { display: block; font-size: 11px; color: #9aa0a6; margin: 0 0 4px; }
+  input {
+    width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 9px;
+    background: #23272f; border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
+    color: #e8eaed; font: inherit; outline: none;
+  }
+  input:focus { border-color: #4a9eff; }
+  button {
+    width: 100%; padding: 8px; margin-bottom: 7px;
+    background: #23272f; border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
+    color: #e8eaed; font: inherit; cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #2b313b; }
+  button.primary { background: #4a9eff; border-color: #4a9eff; color: #fff; font-weight: 500; }
+  button.stop { background: #ff4d4f; border-color: #ff4d4f; color: #fff; font-weight: 500; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  hr { border: 0; border-top: 1px solid rgba(255,255,255,.10); margin: 12px 0; }
+  .hint { font-size: 10.5px; color: #6b7280; line-height: 1.5; margin-top: 6px; }
+</style>
+<body>
+  <h1><span class="dot" id="dot"></span> Light Recorder</h1>
+  <div class="status" id="status">Checking…</div>
+
+  <button class="primary" id="btnRecord">Record this tab</button>
+  <button class="stop" id="btnStop" hidden>Stop recording</button>
+  <button id="btnMic">Allow microphone for tab recordings</button>
+  <div class="hint">Chrome only lets an extension capture a tab that it has been invoked on, so start tab recordings from this button.</div>
+
+  <hr>
+
+  <label for="token">Pairing token (Settings → Advanced)</label>
+  <input type="text" id="token" spellcheck="false" placeholder="Paste the token from the app">
+  <label for="port">Port</label>
+  <input type="number" id="port" min="1024" max="65535">
+  <button id="btnSave">Save and connect</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>

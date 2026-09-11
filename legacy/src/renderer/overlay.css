@@ -1,0 +1,84 @@
+/* The always-on-top control pill. */
+
+body { background: transparent; padding: 4px; }
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 46px;
+  padding: 0 6px 0 10px;
+  background: rgba(20, 22, 26, 0.94);
+  border: 1px solid var(--border-strong);
+  border-radius: 23px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px);
+  -webkit-app-region: drag;
+}
+
+.pill > button { -webkit-app-region: no-drag; }
+
+/* ---- status block ------------------------------------------------------- */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  padding-right: 2px;
+}
+
+.dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+  flex: none;
+  transition: background 200ms;
+}
+body.recording .dot { background: var(--rec); animation: pulse 1.6s ease-in-out infinite; }
+body.starting .dot { background: var(--warn); animation: pulse 0.8s ease-in-out infinite; }
+
+@keyframes pulse { 50% { opacity: 0.25; } }
+
+.status-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.time { font-size: 13px; font-weight: 600; letter-spacing: 0.2px; }
+body.recording .time { color: var(--rec); }
+.sub { font-size: 10.5px; color: var(--fg-faint); }
+
+.divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 3px;
+  flex: none;
+}
+
+/* ---- buttons ------------------------------------------------------------ */
+
+.icon-btn.rec { color: var(--rec); }
+.icon-btn.rec:hover:not(:disabled) { background: rgba(255, 77, 79, 0.16); color: var(--rec); }
+.icon-btn.rec:disabled { color: var(--fg-faint); }
+
+/* The strike-through only shows when the source is muted, which keeps the two
+   audio buttons readable at a glance without a second icon. */
+.slash { opacity: 0; transition: opacity 120ms; }
+.icon-btn.muted .slash { opacity: 1; }
+.icon-btn.muted .wave { opacity: 0; }
+
+/* ---- compact mode ------------------------------------------------------- */
+
+/* While recording the pill shrinks to timer + stop + chevron. The window is
+   resized to match by the main process, anchored on its right edge. */
+body.compact .collapsible { display: none; }
+body.compact .status { flex: none; }
+body.compact .sub { display: none; }
+body.compact .time { font-size: 14px; }
+body.compact .pill { padding-left: 12px; }
+
+/* The chevron flips direction rather than swapping icons, so the two states
+   read as one control. */
+.chevron svg { transition: transform 160ms ease; }
+body:not(.compact) .chevron svg { transform: rotate(180deg); }
+
+#toasts { left: auto; right: 8px; bottom: auto; top: 54px; width: 300px; }

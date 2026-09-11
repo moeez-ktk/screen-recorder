@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Light Recorder</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="overlay.css">
+<body>
+  <div class="pill" id="pill">
+    <!-- status: doubles as the drag handle -->
+    <div class="status" id="status">
+      <span class="dot" id="dot"></span>
+      <div class="status-text">
+        <span class="time mono" id="time">Ready</span>
+        <span class="sub truncate" id="sub">Entire Screen</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="icon-btn rec collapsible" id="btnStart" title="Start recording (Ctrl+Alt+S)" aria-label="Start recording">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+    </button>
+    <button class="icon-btn" id="btnStop" title="Stop recording (Ctrl+Alt+X)" aria-label="Stop recording" disabled>
+      <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+    </button>
+
+    <div class="divider collapsible"></div>
+
+    <button class="icon-btn collapsible" id="btnSource" title="Choose what to record (Ctrl+Alt+P)" aria-label="Choose source">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>
+      </svg>
+    </button>
+    <button class="icon-btn collapsible" id="btnMic" title="Mute microphone (Ctrl+Alt+M)" aria-label="Toggle microphone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/>
+        <line class="slash" x1="3" y1="3" x2="21" y2="21"/>
+      </svg>
+    </button>
+    <button class="icon-btn collapsible" id="btnSys" title="Mute system audio" aria-label="Toggle system audio">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M17 8.5a5 5 0 0 1 0 7"/>
+        <line class="slash" x1="3" y1="3" x2="21" y2="21"/>
+      </svg>
+    </button>
+    <button class="icon-btn collapsible" id="btnMixer" title="Per-app and per-tab audio" aria-label="Audio mixer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M5 21V14M5 10V3M12 21v-9M12 8V3M19 21v-5M19 12V3"/>
+        <path d="M2 14h6M9 8h6M16 16h6"/>
+      </svg>
+    </button>
+    <button class="icon-btn collapsible" id="btnSettings" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+    <!-- Only shown while recording: collapses the pill down to the timer and
+         stop button, and expands it back again. -->
+    <button class="icon-btn chevron" id="btnCollapse" title="Expand" aria-label="Expand recorder" aria-expanded="false" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 6l-6 6 6 6"/>
+      </svg>
+    </button>
+
+    <button class="icon-btn collapsible" id="btnHide" title="Hide overlay (Ctrl+Shift+D)" aria-label="Hide overlay">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18"/>
+      </svg>
+    </button>
+  </div>
+  <script src="common.js"></script>
+  <script src="overlay.js"></script>
+</body>
+</html>

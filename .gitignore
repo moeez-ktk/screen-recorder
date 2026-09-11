@@ -1,0 +1,7 @@
+# Build output: build.ps1 recreates it, and legacy/tools/build-listener.ps1
+# the old hotkey listener
+build/
+legacy/tools/*.exe
+
+# The Electron build's dependencies: npm install restores them
+node_modules/

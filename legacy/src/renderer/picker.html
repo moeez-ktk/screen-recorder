@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Choose what to record</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="picker.css">
+<body>
+  <div class="titlebar">
+    <h1>Choose what to record</h1>
+    <div class="grow"></div>
+    <button class="btn" id="btnRefresh">Refresh</button>
+    <button class="icon-btn" id="btnClose" title="Close" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="screens">Entire screen</button>
+    <button class="tab" data-tab="windows">Application window</button>
+    <button class="tab" data-tab="browser">Browser tab</button>
+  </nav>
+
+  <main id="panel"><div class="loading">Looking for sources…</div></main>
+
+  <footer>
+    <div class="selected truncate" id="selected">Nothing selected</div>
+    <div class="grow"></div>
+    <button class="btn" id="btnCancel">Cancel</button>
+    <button class="btn primary" id="btnUse" disabled>Use this source</button>
+    <button class="btn primary" id="btnRecord" disabled>Record now</button>
+  </footer>
+
+  <script src="common.js"></script>
+  <script src="picker.js"></script>
+</body>
+</html>
