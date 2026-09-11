@@ -321,9 +321,17 @@ legacy/         the previous Electron implementation, kept for reference
   need NV12 input on the CPU path — feeding NVENC planar `yuv420p` makes it fail
   outright with `CreateInputBuffer failed`, so the pixel format is chosen per
   encoder.
-- **Window capture uses GDI** (`gdigrab`), which is more expensive than the
-  GPU path and matches windows by title. Full-screen capture uses `ddagrab`,
-  which is the right path for games — so the default is also the fastest.
+- **A window is recorded as a region of its screen.** The window's rectangle
+  is looked up when recording starts and that part of the monitor goes
+  through `ddagrab`, on the same GPU path as a full screen. The alternative,
+  GDI window capture, records every hardware-accelerated window — browsers,
+  games, Electron apps — as solid black, and found windows by title, so a
+  browser whose title changes with the active tab could not be started at all
+  (`I/O error`). The trade is that the region is fixed for the take: move the
+  window and the recording stays where it was, and a window dragged over it is
+  recorded too. Minimised or closed windows are refused with a message rather
+  than recorded as nothing. Only when ffmpeg has no `ddagrab` does window
+  capture fall back to GDI, by window handle.
 - **Per-app mute is not per-app *recording*.** Isolating one app's audio into a
   recording while leaving it audible needs a kernel driver; muting the session
   is the supported alternative, and it works identically on Windows 10 and 11.
@@ -340,8 +348,9 @@ Two logs, both under `%APPDATA%\Light Recorder\`:
   encoders offered the GPU path, why audio could not open, why the bridge port
   was refused.
 - **`last-recording.log`** — the exact ffmpeg command line, which pipeline it
-  used, how long ffmpeg took to open the audio pipe, and anything it complained
-  about. If a recording comes out empty, this says why.
+  used, how long ffmpeg took to open the audio pipe, and everything ffmpeg
+  said if it failed — whether you stopped it or it died on its own. If a
+  recording comes out empty or short, this says why.
 
 **Settings, logs or autostart that seem to belong to another copy?** A program
 started from inside a packaged (MSIX) app — a terminal or editor installed as a

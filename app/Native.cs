@@ -220,6 +220,22 @@ namespace LightRecorder {
     [DllImport("dwmapi.dll")]
     public static extern int DwmGetWindowAttribute(IntPtr hWnd, int attr, out int value, int size);
 
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmGetWindowAttribute(IntPtr hWnd, int attr, out RECT value, int size);
+
+    /// <summary>DWMWA_EXTENDED_FRAME_BOUNDS: the window as drawn, without the
+    /// invisible resize border GetWindowRect includes - eight pixels on each
+    /// side of a maximised window, which would otherwise be off the screen.</summary>
+    public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+    /// <summary>The window's on-screen rectangle in physical pixels.</summary>
+    public static Rectangle WindowFrame(IntPtr hWnd) {
+      RECT r;
+      if (DwmGetWindowAttribute(hWnd, DWMWA_EXTENDED_FRAME_BOUNDS, out r, Marshal.SizeOf(typeof(RECT))) == 0)
+        return r.ToRectangle();
+      return GetWindowRect(hWnd, out r) ? r.ToRectangle() : Rectangle.Empty;
+    }
+
     /// <summary>DWMWA_CLOAKED. Store apps that are "running" but not on screen
     /// report visible through IsWindowVisible and would otherwise fill the
     /// picker with ghosts.</summary>

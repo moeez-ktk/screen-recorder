@@ -24,6 +24,10 @@ namespace LightRecorder {
     // window
     public IntPtr Handle = IntPtr.Zero;
     public string Title = "";
+    /// <summary>Where the window sits on its monitor, relative to that
+    /// monitor's top-left, as ddagrab wants it. Set by
+    /// Sources.ResolveWindow when a recording starts.</summary>
+    public Rectangle Region;
 
     // tab
     public int TabId = -1;
@@ -193,7 +197,7 @@ namespace LightRecorder {
           s.Handle = hWnd;
           s.Id = "window:" + hWnd.ToInt64();
           s.Name = title;
-          s.Title = title;                 // gdigrab matches on the window title
+          s.Title = title;
           s.Width = r.Width;
           s.Height = r.Height;
           s.Bounds = r.ToRectangle();
@@ -214,6 +218,63 @@ namespace LightRecorder {
         return string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase);
       });
       return list;
+    }
+
+    /// <summary>
+    /// Work out where a window is right now, so a recording captures that
+    /// part of the screen.
+    ///
+    /// A window is recorded as a region of its monitor through ddagrab, not
+    /// by asking GDI for the window's own pixels. GDI capture of anything
+    /// hardware-accelerated - every browser, every game, most of what people
+    /// record - comes back solid black, and it found the window by title, so
+    /// a browser whose title changes with the active tab could not be started
+    /// at all. The region is what the user sees; a window dragged over it
+    /// gets recorded too, which is the trade.
+    ///
+    /// Called when recording starts, not when the window was picked: the
+    /// window has usually moved since, and it may be gone.
+    /// </summary>
+    public static bool ResolveWindow(Source s, out string error) {
+      error = null;
+      if (s.Handle == IntPtr.Zero || !Native.IsWindow(s.Handle)) {
+        error = "That window has been closed. Pick another source.";
+        return false;
+      }
+      if (Native.IsIconic(s.Handle)) {
+        error = "That window is minimised, so there is nothing on screen to record. Restore it first.";
+        return false;
+      }
+
+      Rectangle frame = Native.WindowFrame(s.Handle);
+      IntPtr mon = Native.MonitorFromWindow(s.Handle, Native.MONITOR_DEFAULTTONEAREST);
+      var info = new Native.MONITORINFOEX();
+      info.cbSize = Marshal.SizeOf(typeof(Native.MONITORINFOEX));
+      if (frame.Width <= 0 || frame.Height <= 0 || !Native.GetMonitorInfo(mon, ref info)) {
+        error = "Could not find that window on any screen.";
+        return false;
+      }
+
+      // Only what is actually on the monitor can be captured, and H.264 wants
+      // even dimensions.
+      Rectangle monitor = info.rcMonitor.ToRectangle();
+      Rectangle visible = Rectangle.Intersect(frame, monitor);
+      visible.Width &= ~1;
+      visible.Height &= ~1;
+      if (visible.Width < 2 || visible.Height < 2) {
+        error = "That window is off screen. Move it onto a display first.";
+        return false;
+      }
+
+      int idx;
+      Dictionary<string, int> outputs = Dxgi.OutputIndexByDeviceName();
+      s.OutputIdx = outputs.TryGetValue(info.szDevice ?? "", out idx) ? idx : 0;
+      s.Region = new Rectangle(visible.X - monitor.X, visible.Y - monitor.Y, visible.Width, visible.Height);
+      s.Bounds = visible;
+      s.Width = visible.Width;
+      s.Height = visible.Height;
+      s.Title = Native.WindowTitle(s.Handle);
+      return true;
     }
 
     // ----------------------------------------------------------- thumbnails

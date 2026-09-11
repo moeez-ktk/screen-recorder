@@ -366,6 +366,16 @@ namespace LightRecorder {
 
       if (CurrentSource.Kind == "tab") { StartTabRecording(s); return; }
 
+      if (CurrentSource.Kind == "window") {
+        // Where the window is now, not where it was when it was picked.
+        string why;
+        if (!Sources.ResolveWindow(CurrentSource, out why)) {
+          Toast(why, ToastKind.Error);
+          return;
+        }
+        NotifyState();       // the label may have followed the title
+      }
+
       if (EncoderInfo.Ffmpeg == null) {
         Toast("ffmpeg was not found. Set its path in Settings.", ToastKind.Error);
         return;
@@ -579,8 +589,11 @@ namespace LightRecorder {
             ActiveMode = null;
             SetTrayState();
             SetCompact(false);
-            if (r != null && r.Error != null)
+            if (r != null && r.Error != null) {
               Toast("Recording stopped: " + LastLine(r.Error), ToastKind.Error);
+              // The toast shows one line; the log keeps everything ffmpeg said.
+              Log.AppendRecording("\nFAILED (ffmpeg exited on its own)\n" + r.Error + "\n");
+            }
             NotifyState();
           }
         });

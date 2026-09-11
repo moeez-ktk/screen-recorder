@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
@@ -115,7 +116,10 @@ namespace LightRecorder {
       string pts = PtsFilter(anchorSeconds);
 
       bool scaling = !string.IsNullOrEmpty(s.Resolution) && s.Resolution != "source";
-      bool useDda = hasDdagrab && source.Kind == "screen";
+      // Windows are captured as a region of their monitor, so they take the
+      // same GPU path as a screen. See Sources.ResolveWindow.
+      bool window = source.Kind == "window";
+      bool useDda = hasDdagrab && (source.Kind == "screen" || (window && source.Region.Width > 0));
       gpuDirect = useDda && !scaling && encoder != null && encoder.AcceptsD3D11;
 
       // Hardware encoders want NV12 (semi-planar) and genuinely fail on planar
@@ -152,6 +156,12 @@ namespace LightRecorder {
           "framerate=" + fps,
           "draw_mouse=" + cursor
         };
+        if (window) {
+          Rectangle r = source.Region;
+          opts.Add("offset_x=" + r.X);
+          opts.Add("offset_y=" + r.Y);
+          opts.Add("video_size=" + r.Width + "x" + r.Height);
+        }
         // Stamped with the wall clock as each frame is read, which is the
         // moment it was captured. ddagrab's own timestamps start from zero at
         // its first frame and say nothing about when that was.
@@ -176,8 +186,10 @@ namespace LightRecorder {
         a.Add("-draw_mouse"); a.Add(cursor.ToString(CultureInfo.InvariantCulture));
         a.Add("-thread_queue_size"); a.Add("512");
 
-        if (source.Kind == "window" && !string.IsNullOrEmpty(source.Title)) {
-          a.Add("-i"); a.Add("title=" + source.Title);
+        if (window && source.Handle != IntPtr.Zero) {
+          // By handle, not title: a browser's title changes with every tab
+          // switch, and gdigrab then cannot find the window at all.
+          a.Add("-i"); a.Add("hwnd=" + source.Handle.ToInt64().ToString(CultureInfo.InvariantCulture));
         } else {
           a.Add("-i"); a.Add("desktop");
         }

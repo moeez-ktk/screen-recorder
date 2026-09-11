@@ -882,7 +882,8 @@ namespace LightRecorder.Ui {
       if (set.Ffmpeg == null) return "Not found. - Screen and window recording need it.";
       return set.HasDdagrab
         ? "Desktop Duplication available - GPU screen capture, ideal for games."
-        : "No ddagrab filter - falling back to GDI capture, which uses more CPU.";
+        : "No ddagrab filter - falling back to GDI capture, which uses more CPU and records " +
+          "browsers and games as black.";
     }
 
     bool FfmpegHintGood() {
